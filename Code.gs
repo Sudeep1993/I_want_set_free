@@ -15,6 +15,7 @@
  */
 
 const SHEET_NAME = 'Sheet1';
+const DATE_COL = 2; // lastDay column
 
 function getSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -25,14 +26,41 @@ function getSheet_() {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(['name', 'lastDay', 'notice']);
   }
+  // Force the lastDay column to plain text so Sheets never silently
+  // reformats/re-locales a typed date — every write lands as literal yyyy-MM-dd.
+  sheet.getRange(1, DATE_COL, Math.max(sheet.getMaxRows(), 1000), 1).setNumberFormat('@');
   return sheet;
 }
 
+// Normalizes any value we might encounter in the lastDay cell — a real Date
+// (legacy rows, or someone pasting a date that Sheets auto-converted), an
+// ISO string, or a locale-formatted string typed by hand — down to one
+// canonical yyyy-MM-dd shape. Returns '' if it truly can't be read.
 function formatDate_(value) {
   if (value instanceof Date) {
     return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
-  return String(value || '');
+  const str = String(value || '').trim();
+  if (!str) return '';
+
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // yyyy-MM-dd
+  if (m) return pad_(m[1], 4) + '-' + pad_(m[2]) + '-' + pad_(m[3]);
+
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // MM/dd/yyyy (Sheets default US locale)
+  if (m) return pad_(m[3], 4) + '-' + pad_(m[1]) + '-' + pad_(m[2]);
+
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return '';
+}
+
+function pad_(n, len) {
+  n = String(n);
+  len = len || 2;
+  while (n.length < len) n = '0' + n;
+  return n;
 }
 
 function doGet(e) {
@@ -57,7 +85,7 @@ function doPost(e) {
   sheet.clearContents();
   sheet.appendRow(['name', 'lastDay', 'notice']);
   if (people.length > 0) {
-    const rows = people.map(p => [p.name, p.lastDay, p.notice]);
+    const rows = people.map(p => [p.name, formatDate_(p.lastDay), p.notice]);
     sheet.getRange(2, 1, rows.length, 3).setValues(rows);
   }
 

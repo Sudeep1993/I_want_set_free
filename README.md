@@ -68,3 +68,9 @@ The status dot at the top of the page tells you exactly what's wrong:
 ## Data format
 
 One row per person in the sheet: `name`, `lastDay` (YYYY-MM-DD), `notice` (days).
+
+The `lastDay` column is kept as plain text and always normalized to `YYYY-MM-DD` by the
+Apps Script backend, on both read and write — so editing the sheet by hand (which Sheets
+would otherwise auto-convert to a locale-formatted date) can't produce an "Invalid date"
+on the board. If you edit `Code.gs` in your deployment, re-paste the updated
+[`apps-script/Code.gs`](./apps-script/Code.gs) and redeploy for this to take effect.
